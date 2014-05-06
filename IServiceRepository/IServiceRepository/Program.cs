@@ -1,10 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.ServiceModel;
 using System.Runtime.Serialization;
 using Npgsql;
+
+// Czemu wybrales akurat PostgreSQL, nie lepiej bylo wziac MySQL? Akurat z Postgre nie mialem jeszcze doczynienia.
 
 //Wstepne szkic, musze troche lepiej zapoznac sie z operowaniem na bazach danych
 
