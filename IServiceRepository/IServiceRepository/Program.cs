@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -7,9 +7,8 @@ using System.Drawing;
 using System.ComponentModel;
 using System.ServiceModel;
 using System.Runtime.Serialization;
-using Npgsql;
+using System.Net.NetworkInformation;
 using MySql.Data.MySqlClient;
-
 
 namespace Contracts
 {
@@ -146,43 +145,31 @@ namespace Contracts
 
         public void isAlive(string serviceName)
         {
-            string MyConnectionString = "Server=localhost;Database=test;Uid=root;Pwd=;";
-            string adres = null;
-            MySqlDataReader reader = null;
-            MySqlConnection connection = null;
+            int pingCounter = 0;
+            bool pingable = false;
+            Ping pinger = new Ping();
 
-            try
+            while (pingable == false)
             {
-                connection = new MySqlConnection(MyConnectionString);
-                connection.Open();
-                string cmdText = "SELECT adres FROM service WHERE nazwa = '" + serviceName + "';";
-                MySqlCommand cmd = new MySqlCommand(cmdText, connection);
-                reader = cmd.ExecuteReader();
-
-                while (reader.Read())
+                try
                 {
-                    adres = reader.GetString(0);
+                    PingReply reply = pinger.Send(getServiceAddress(serviceName));
+                    pingable = reply.Status == IPStatus.Success;
                 }
-                //w tym miejscu raczej dodac pingowanie adresu i w przypadku braku odpowiedzi wywolac unregister
-            }
-
-            catch (MySqlException err)
-            {
-                Console.WriteLine("Error: " + err.ToString());
-            }
-
-            finally
-            {
-                if (reader != null)
+                
+                catch (PingException)
                 {
-                    reader.Close();
+               
                 }
-                if (connection != null)
+
+                if (pingable == false) pingCounter++;
+                
+                if (pingCounter == 3)
                 {
-                    connection.Close();
+                    unregisterService(serviceName);
+                    break;
                 }
             }
         }
     }
-    
 }
