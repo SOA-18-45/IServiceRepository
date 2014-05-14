@@ -16,8 +16,52 @@ namespace Contracts
     {
         static void Main(string[] args)
         {
-            //dodac oczekiwanie na polaczenie od innych serwisow
+            int i = 0;
+            string MyConnectionString = "Server=localhost;Database=test;Uid=root;Pwd=;";
+            string [] nazwa = new string[9];
+            MySqlDataReader reader = null;
+            MySqlConnection connection = null;
 
+            try
+            {
+                connection = new MySqlConnection(MyConnectionString);
+                connection.Open();
+                string cmdText = "SELECT nazwa FROM service;";
+                MySqlCommand cmd = new MySqlCommand(cmdText, connection);
+                reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    nazwa[i] = reader.GetString(0);
+                    i++;
+                }
+            }
+
+            catch (MySqlException err)
+            {
+                Console.WriteLine("Error: " + err.ToString());
+            }
+
+            finally
+            {
+                if (reader != null)
+                {
+                    reader.Close();
+                }
+                if (connection != null)
+                {
+                    connection.Close();
+                }
+            }
+
+            i = 0;
+            ServiceRepository serviceRepository = new ServiceRepository();
+
+            while (nazwa[i] != null)
+            {
+                serviceRepository.isAlive(nazwa[i]);
+                i++;
+            }
         }
     }
 
