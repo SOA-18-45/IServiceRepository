@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<hibernate-mapping xmlns="urn:nhibernate-mapping-2.2"
+                   assembly="IServiceRepository"
+                   namespace="IServiceRepository.Domain">
+
+  <class name="Services">
+    <id name="Id">
+      <generator class="guid" />
+    </id>
+    <property name="ServiceName" />
+    <property name="ServiceAddress" />
+    <property name="BindingType" />
+    <property name="Counter" />
+  </class>
+
+</hibernate-mapping>

@@ -1,9 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.21005.1
-MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IServiceRepository", "IServiceRepository\IServiceRepository.csproj", "{712F025D-8B43-424F-B8E9-07558D3CB6EA}"
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IServiceRepository", "IServiceRepository\IServiceRepository.csproj", "{123C1368-AD9A-4469-B83C-DB9C71B434AB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +9,10 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{712F025D-8B43-424F-B8E9-07558D3CB6EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{712F025D-8B43-424F-B8E9-07558D3CB6EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{712F025D-8B43-424F-B8E9-07558D3CB6EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{712F025D-8B43-424F-B8E9-07558D3CB6EA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{123C1368-AD9A-4469-B83C-DB9C71B434AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{123C1368-AD9A-4469-B83C-DB9C71B434AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{123C1368-AD9A-4469-B83C-DB9C71B434AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{123C1368-AD9A-4469-B83C-DB9C71B434AB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

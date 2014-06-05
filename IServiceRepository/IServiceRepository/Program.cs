@@ -1,68 +1,114 @@
+﻿using IServiceRepository;
+using IServiceRepository.Domain;
+using NHibernate;
+using NHibernate.Cfg;
+using NHibernate.Tool.hbm2ddl;
 using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
-using System.Text;
-using System.Drawing;
-using System.ComponentModel;
-using System.ServiceModel;
 using System.Runtime.Serialization;
-using System.Net.NetworkInformation;
-using MySql.Data.MySqlClient;
+using System.ServiceModel;
+using System.ServiceModel.Description;
+using System.Text;
+using System.Threading.Tasks;
+using System.Timers;
 
 namespace Contracts
 {
-    class Program
+    public class Program
     {
+        public static ServiceRepository serviceRepo = new ServiceRepository();
+        
         static void Main(string[] args)
         {
-            int i = 0;
-            string MyConnectionString = "Server=localhost;Database=test;Uid=root;Pwd=;";
-            string [] nazwa = new string[9];
-            MySqlDataReader reader = null;
-            MySqlConnection connection = null;
+            log4net.Config.XmlConfigurator.Configure();
+            LoadNHibernateCfg();
 
-            try
+            /*
+            ServiceHost sh = new ServiceHost(serviceRepo, new Uri[] { new Uri("net.tcp://192.168.0.102:50000/IServiceRepository") });
+            sh.AddServiceEndpoint(typeof(IServiceRepository), new NetTcpBinding(SecurityMode.None), "net.tcp://192.168.0.102:50000/IServiceRepository");
+            */
+            ServiceHost sh = new ServiceHost(serviceRepo, new Uri[] { new Uri("net.tcp://localhost:12345/IServiceRepository") });
+            sh.AddServiceEndpoint(typeof(IServiceRepository), new NetTcpBinding(SecurityMode.None), "net.tcp://localhost:12345/IServiceRepository");
+            sh.Open();
+            
+            Logger.log.Info("IServiceRepository has started!");
+
+            /*
+            var binding = new NetTcpBinding(SecurityMode.None);
+            binding.MaxReceivedMessageSize = 1000000;
+            binding.MaxBufferSize = 1000000;
+            binding.MaxBufferPoolSize = 1000000;
+            sh.AddServiceEndpoint(typeof(IBank), binding, "net.tcp://localhost:50000/IBank");
+            
+            ServiceMetadataBehavior metadata = sh.Description.Behaviors.Find<ServiceMetadataBehavior>();
+            if (metadata == null)
             {
-                connection = new MySqlConnection(MyConnectionString);
-                connection.Open();
-                string cmdText = "SELECT nazwa FROM service;";
-                MySqlCommand cmd = new MySqlCommand(cmdText, connection);
-                reader = cmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    nazwa[i] = reader.GetString(0);
-                    i++;
-                }
+                metadata = new ServiceMetadataBehavior();
+                sh.Description.Behaviors.Add(metadata);
             }
+            metadata.MetadataExporter.PolicyVersion = PolicyVersion.Policy15;
+            sh.AddServiceEndpoint(ServiceMetadataBehavior.MexContractName, MetadataExchangeBindings.CreateMexTcpBinding(), "mex");
+            */
 
-            catch (MySqlException err)
-            {
-                Console.WriteLine("Error: " + err.ToString());
-            }
+            Timer timer = new Timer(1000 * 5);
+            timer.AutoReset = true;
+            timer.Elapsed += new ElapsedEventHandler(RefreshServicesList);
+            timer.Start();
 
-            finally
+            /*
+            serviceRepo.registerService("TestRepository2", "net.tcp://localhost:50000/TestRepository1", "net.tcp");
+            serviceRepo.registerService("TestRepository2", "http://localhost:50000/TestRepository2", "http");
+            serviceRepo.registerService("TestRepository2", "udp://localhost:50000/TestRepository3", "udp");                       
+            timer.Elapsed += new ElapsedEventHandler(TestMethod);
+            */
+            
+            Console.ReadLine();
+            sh.Close();
+            timer.Stop();
+            Logger.log.Info("IServiceRepository has ended!");
+        }
+
+        /*
+        public static void TestMethod(object sender, EventArgs e)
+        {
+            //serviceRepo.unregisterService("TestRepository2");
+            serviceRepo.isAlive("TestRepository2");
+        }
+        */ 
+
+        public static void LoadNHibernateCfg()
+        {
+            var cfg = new Configuration();
+            cfg.Configure();
+            cfg.AddAssembly(typeof(Services).Assembly);
+            new SchemaExport(cfg).Execute(true, true, false);
+        }
+
+        /* Tutaj zmienić te CreateQuery() na session.delete() oraz session.update(), w zależności od spełnionego warunku, ale dla wielu rekordów, nie tylko dla jednego */
+        public static void RefreshServicesList(object sender, EventArgs e)
+        {            
+            // DELETE & UPDATE
+            using (ISession session = NHibernateHelper.OpenSession())
             {
-                if (reader != null)
+                var updateQuery = session.CreateQuery("UPDATE Services SET Counter = Counter - 1");
+                int updatedRecordNumber = updateQuery.ExecuteUpdate();
+                if (updatedRecordNumber == 0) Logger.log.Info("There are no services!");
+                else Logger.log.Info("There are " + updatedRecordNumber + " services!");
+
+                if (updatedRecordNumber != 0)
                 {
-                    reader.Close();
+                    var deleteQuery = session.CreateQuery("DELETE FROM Services WHERE Counter <= 0");
+                    int deletedRecordNumber = deleteQuery.ExecuteUpdate();
+                    if (deletedRecordNumber != 0) Logger.log.Info(deletedRecordNumber + " services have been deleted!");
                 }
-                if (connection != null)
-                {
-                    connection.Close();
-                }
-            }
-
-            i = 0;
-            ServiceRepository serviceRepository = new ServiceRepository();
-
-            while (nazwa[i] != null)
-            {
-                serviceRepository.isAlive(nazwa[i]);
-                i++;
             }
         }
+    }
+
+    public class Logger 
+    {
+        internal static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
     }
 
     [DataContract]
@@ -73,146 +119,108 @@ namespace Contracts
 
         [DataMember]
         public string ServiceAddress { get; set; }
+
+        [DataMember]
+        public string BindingType { get; set; }
     }
 
     [ServiceContract]
     public interface IServiceRepository
     {
         [OperationContract]
-        void registerService(string serviceName, string serviceAddress);
+        void registerService(string serviceName, string serviceAddress, string bindingType);
 
         [OperationContract]
         void unregisterService(string serviceName);
 
         [OperationContract]
-        string getServiceAddress(string serviceName);
+        string getServiceAddress(string serviceName, string bindingType);
 
         [OperationContract]
         void isAlive(string serviceName);
     }
 
+    [ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
     public class ServiceRepository : IServiceRepository
     {
-        public void registerService(string serviceName, string serviceAddress)
+        public void registerService(string serviceName, string serviceAddress, string bindingType)
         {
-            string MyConnectionString = "Server=localhost;Database=test;Uid=root;Pwd=;";
-            MySqlConnection connection = null;
-            try
+            // CREATE
+            using (ISession session = NHibernateHelper.OpenSession())
             {
-                connection = new MySqlConnection(MyConnectionString);
-                connection.Open();
-                string cmdText = "INSERT INTO service VALUES(@name,@adres);";
-                MySqlCommand cmd = new MySqlCommand(cmdText, connection);
-                cmd.Prepare();
-                cmd.Parameters.AddWithValue("@name", serviceName);
-                cmd.Parameters.AddWithValue("@adres", serviceAddress);
-                cmd.ExecuteNonQuery();
-            }
-            catch (MySqlException err)
-            {
-                Console.WriteLine("Error: " + err.ToString());
-            }
-            finally
-            {
-                if (connection != null)
-                {
-                    connection.Close();
+                using (ITransaction transaction = session.BeginTransaction())
+                {                  
+                    Services serviceExists = session.QueryOver<Services>().Where(x => x.ServiceName == serviceName && x.BindingType == bindingType).SingleOrDefault();
+                    Services service = new Services { ServiceName = serviceName, ServiceAddress = serviceAddress, BindingType = bindingType, Counter = 3 };
+                    if (serviceExists == null) session.Save(service);                   
+                    else session.Update(service);                                          
+                    transaction.Commit();
+                  
+                    Logger.log.Info(serviceName + " on " + serviceAddress + " using a " + bindingType + " protocol was registered!");
                 }
-            }
+            }           
         }
 
+        /* Tutaj zmienić to CreateQuery() na session.delete(), ale dla wielu rekordów, nie tylko dla jednego */
         public void unregisterService(string serviceName)
         {
-            string MyConnectionString = "Server=localhost;Database=test;Uid=root;Pwd=;";
-            MySqlConnection connection = null;
-            try
+            // DELETE
+            using (ISession session = NHibernateHelper.OpenSession())
             {
-                connection = new MySqlConnection(MyConnectionString);
-                connection.Open();
-                string cmdText = "DELETE FROM service WHERE nazwa = '" + serviceName + "';";
-                MySqlCommand cmd = new MySqlCommand(cmdText, connection);
-                cmd.ExecuteNonQuery();
-            }
-            catch (MySqlException err)
-            {
-                Console.WriteLine("Error: " + err.ToString());
-            }
-            finally
-            {
-                if (connection != null)
-                {
-                    connection.Close();
-                }
-            }
-        }
-
-        public string getServiceAddress(string serviceName)
-        {
-            string MyConnectionString = "Server=localhost;Database=test;Uid=root;Pwd=;";
-            string adres = null;
-            MySqlDataReader reader = null;
-            MySqlConnection connection = null;
-
-            try
-            {
-                connection = new MySqlConnection(MyConnectionString);
-                connection.Open();
-                string cmdText = "SELECT adres FROM service WHERE nazwa = '"+serviceName+"';";
-                MySqlCommand cmd = new MySqlCommand(cmdText, connection);
-                reader = cmd.ExecuteReader();
+                var deleteQuery = session.CreateQuery("DELETE FROM Services WHERE ServiceName = :serviceName");
+                deleteQuery.SetString("serviceName", serviceName).ExecuteUpdate();                
+                Logger.log.Info(serviceName + " was unregistered!");              
                 
-                while (reader.Read())
+                /*
+                using (ITransaction transaction = session.BeginTransaction())
                 {
-                    adres = reader.GetString(0);
+                    session.Delete(session.QueryOver<Services>().Where(x => x.ServiceName == serviceName));
+                    transaction.Commit();
+                    Logger.log.Info(serviceName + " was unregistered!");
                 }
-            }
-
-            catch (MySqlException err)
-            {
-                Console.WriteLine("Error: " + err.ToString());
-            }
-
-            finally
-            {
-                if (reader != null)
-                {
-                    reader.Close();
-                }
-                if (connection != null)
-                {
-                    connection.Close();
-                }
-            }
-
-            return adres;
+                */
+            }         
         }
 
+        public string getServiceAddress(string serviceName, string bindingType)
+        {
+            // READ
+            using (ISession session = NHibernateHelper.OpenSession())
+            {
+                Services service = session.QueryOver<Services>().Where(x => x.ServiceName == serviceName && x.BindingType == bindingType).SingleOrDefault();
+                if (service == null) return serviceName + " using a " + bindingType + " protocol is not registered!";
+                else
+                {
+                    Logger.log.Info(service.ServiceAddress + " was resolved for " + serviceName + " using a " + bindingType + " protocol");
+                    return service.ServiceAddress;
+                }
+            }           
+        }
+
+        /* Tutaj zmienić to CreateQuery() na session.update(), ale dla wielu rekordów, nie tylko dla jednego */
         public void isAlive(string serviceName)
         {
-            int pingCounter = 0;
-            bool pingable = false;
-            Ping pinger = new Ping();
-
-            while (pingable == false)
+            // UPDATE
+            using (ISession session = NHibernateHelper.OpenSession())
             {
-                try
-                {
-                    PingReply reply = pinger.Send(getServiceAddress(serviceName));
-                    pingable = reply.Status == IPStatus.Success;
-                }
-                
-                catch (PingException)
-                {
-               
-                }
+                var updateQuery = session.CreateQuery("UPDATE Services SET Counter = 3 WHERE ServiceName = :serviceName");
+                updateQuery.SetString("serviceName", serviceName).ExecuteUpdate();
+                Logger.log.Info(serviceName + " is alive!");
 
-                if (pingable == false) pingCounter++;
-                
-                if (pingCounter == 3)
+                /*
+                Services service = session.QueryOver<Services>().Where(x => x.ServiceName == serviceName).SingleOrDefault();               
+                if (service != null)
                 {
-                    unregisterService(serviceName);
-                    break;
+                    service.Counter = 3;
+
+                    using (ITransaction transaction = session.BeginTransaction())
+                    {
+                        session.Update(service);
+                        transaction.Commit();
+                        Logger.log.Info(serviceName + " is alive!");
+                    }
                 }
+                */ 
             }
         }
     }
