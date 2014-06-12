@@ -3,6 +3,7 @@ using IServiceRepository.Domain;
 using NHibernate;
 using NHibernate.Cfg;
 using NHibernate.Tool.hbm2ddl;
+using NHibernate.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -91,16 +92,27 @@ namespace Contracts
             // DELETE & UPDATE
             using (ISession session = NHibernateHelper.OpenSession())
             {
-                var updateQuery = session.CreateQuery("UPDATE Services SET Counter = Counter - 1");
+                Services services = session.Query<Services>().SingleOrDefault();
+                services.Counter = services.Counter - 1;
+                session.Update(services);
+
+                if (services.Counter == 0) Logger.log.Info("There are no services!");
+                else Logger.log.Info("There are " + services.Counter + " services!");
+                /*var updateQuery = session.CreateQuery("UPDATE Services SET Counter = Counter - 1");
                 int updatedRecordNumber = updateQuery.ExecuteUpdate();
                 if (updatedRecordNumber == 0) Logger.log.Info("There are no services!");
-                else Logger.log.Info("There are " + updatedRecordNumber + " services!");
+                else Logger.log.Info("There are " + updatedRecordNumber + " services!");*/       
 
-                if (updatedRecordNumber != 0)
+                if (services.Counter != 0)
                 {
-                    var deleteQuery = session.CreateQuery("DELETE FROM Services WHERE Counter <= 0");
+                    var services_del = session.Query<Services>().Where(x => x.Counter <= 0);
+                    foreach (Services s in services_del)
+                        session.Delete(s);
+
+                    //if (servi != 0) Logger.log.Info(deletedRecordNumber + " services have been deleted!");
+                    /*var deleteQuery = session.CreateQuery("DELETE FROM Services WHERE Counter <= 0");
                     int deletedRecordNumber = deleteQuery.ExecuteUpdate();
-                    if (deletedRecordNumber != 0) Logger.log.Info(deletedRecordNumber + " services have been deleted!");
+                    if (deletedRecordNumber != 0) Logger.log.Info(deletedRecordNumber + " services have been deleted!");*/
                 }
             }
         }
@@ -166,20 +178,35 @@ namespace Contracts
         {
             // DELETE
             using (ISession session = NHibernateHelper.OpenSession())
-            {
-                var deleteQuery = session.CreateQuery("DELETE FROM Services WHERE ServiceName = :serviceName");
-                deleteQuery.SetString("serviceName", serviceName).ExecuteUpdate();                
-                Logger.log.Info(serviceName + " was unregistered!");              
-                
-                /*
                 using (ITransaction transaction = session.BeginTransaction())
                 {
-                    session.Delete(session.QueryOver<Services>().Where(x => x.ServiceName == serviceName));
+                    var services = session.Query<Services>().Where(x => x.ServiceName == serviceName);
+                    foreach (Services s in services)
+                        session.Delete(s);
+
                     transaction.Commit();
                     Logger.log.Info(serviceName + " was unregistered!");
-                }
-                */
-            }         
+                    
+                    //var ts = session.QueryOver<Services>().Where(x => x.ServiceName == serviceName).SingleOrDefault();
+
+                    //foreach (var bla in ts)
+                    //foreach (Services nowy in service)
+
+                    //(session.Query<Services>().Where(x => x.ServiceName == serviceName)).ForEach(t => session.Delete(t));
+                    
+                    /*var deleteQuery = session.CreateQuery("DELETE FROM Services WHERE ServiceName = :serviceName");
+                    deleteQuery.SetString("serviceName", serviceName).ExecuteUpdate();                
+                    Logger.log.Info(serviceName + " was unregistered!");   */           
+                
+                    /*
+                    using (ITransaction transaction = session.BeginTransaction())
+                    {
+                        session.Delete(session.QueryOver<Services>().Where(x => x.ServiceName == serviceName));
+                        transaction.Commit();
+                        Logger.log.Info(serviceName + " was unregistered!");
+                    }
+                    */
+                }         
         }
 
         public string getServiceAddress(string serviceName, string bindingType)
@@ -202,26 +229,35 @@ namespace Contracts
         {
             // UPDATE
             using (ISession session = NHibernateHelper.OpenSession())
-            {
-                var updateQuery = session.CreateQuery("UPDATE Services SET Counter = 3 WHERE ServiceName = :serviceName");
-                updateQuery.SetString("serviceName", serviceName).ExecuteUpdate();
-                Logger.log.Info(serviceName + " is alive!");
-
-                /*
-                Services service = session.QueryOver<Services>().Where(x => x.ServiceName == serviceName).SingleOrDefault();               
-                if (service != null)
+                using (ITransaction transaction = session.BeginTransaction())
                 {
-                    service.Counter = 3;
+                    Services services = session.Query<Services>().Where(x => x.ServiceName == serviceName).SingleOrDefault();
+                    services.Counter = 3;
+                    //foreach (Services s in services)
+                    session.Update(services);
 
-                    using (ITransaction transaction = session.BeginTransaction())
+                    transaction.Commit();
+                    Logger.log.Info(serviceName + " is alive!");
+                    
+                    /*var updateQuery = session.CreateQuery("UPDATE Services SET Counter = 3 WHERE ServiceName = :serviceName");
+                    updateQuery.SetString("serviceName", serviceName).ExecuteUpdate();
+                    Logger.log.Info(serviceName + " is alive!");*/
+
+                    /*
+                    Services service = session.QueryOver<Services>().Where(x => x.ServiceName == serviceName).SingleOrDefault();               
+                    if (service != null)
                     {
-                        session.Update(service);
-                        transaction.Commit();
-                        Logger.log.Info(serviceName + " is alive!");
+                        service.Counter = 3;
+
+                        using (ITransaction transaction = session.BeginTransaction())
+                        {
+                            session.Update(service);
+                            transaction.Commit();
+                            Logger.log.Info(serviceName + " is alive!");
+                        }
                     }
+                    */ 
                 }
-                */ 
-            }
         }
     }
 }
